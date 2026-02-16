@@ -2,11 +2,12 @@ import pytest
 import requests
 
 @pytest.fixture
-def mock_requests_get(mocker):
+def mock_requests_get(monkeypatch):
+    # prepare mocked JSON data
     response_json = {"businesses":[{"name":"Teton Elementary"}]}
     
     # Patching requests.get to return a mocked response
-    mocker.patch.object(requests, 'get', return_value=MockResponse(response_json))
+    monkeypatch.setattr(requests, 'get', lambda *args, **kwargs: MockResponse(response_json))
 
 class MockResponse:
     def __init__(self, json_data, status_code=200):
