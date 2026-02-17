@@ -2,21 +2,15 @@
 name: Simple CI/CD Pipeline for CSE 270
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -27,28 +21,33 @@ jobs:
     steps:
     - name: Checkout the latest code
       uses: actions/checkout@v4.1.2
+
     - name: Set up Python 3.12
       uses: actions/setup-python@v5.0.0
       with:
         python-version: "3.12"
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install flake8 pytest requests pytest-mock selenium requests-mock coverage
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    # ✅ Added: Firefox + Geckodriver setup for Selenium tests in CI
+    # ✅ Added: Setup Firefox (required for Firefox Selenium in CI)
     - name: Setup Firefox
       uses: browser-actions/setup-firefox@v1
-    - name: Setup Geckodriver
-      uses: browser-actions/setup-geckodriver@v0.0.0
+
+    # ✅ Added: Install Geckodriver reliably (instead of action)
+    - name: Install Geckodriver
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y firefox-geckodriver
 
     - name: Lint with flake8
       run: |
-        # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
     - name: Startup HTTP Server for pipeline tests
       uses: Eun/http-server-action@v1.0.11
       with:
@@ -56,6 +55,7 @@ jobs:
         port: 5500
         index-files: |
           ["index.html", "index.htm"]
+
     - name: Run tests
       env:
         BASE_URL: http://127.0.0.1:5500
@@ -75,7 +75,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript']
-          # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby', 'swift' ]
-          # Use only 'java' to analyze code written in Java, Kotlin or both
-          # Use only 'javascript' to analyze code written in JavaScript, T
+        language: [ 'javascript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4.1.2
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+  deploy:
+    needs: analyze
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.2
+      - name: Setup Pages
+        uses: actions/configure-pages@v4.0.0
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3.0.1
+        with:
+          path: 'teton/1.6'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4.0.5
