@@ -37,11 +37,14 @@ jobs:
     - name: Setup Firefox
       uses: browser-actions/setup-firefox@v1
 
-    # ✅ Added: Install Geckodriver reliably (instead of action)
+    # ✅ FIXED: Install Geckodriver (ubuntu-latest no longer provides firefox-geckodriver)
     - name: Install Geckodriver
       run: |
-        sudo apt-get update
-        sudo apt-get install -y firefox-geckodriver
+        GECKO_VERSION="v0.34.0"
+        wget -q https://github.com/mozilla/geckodriver/releases/download/${GECKO_VERSION}/geckodriver-${GECKO_VERSION}-linux64.tar.gz
+        tar -xzf geckodriver-${GECKO_VERSION}-linux64.tar.gz
+        sudo mv geckodriver /usr/local/bin/
+        geckodriver --version
 
     - name: Lint with flake8
       run: |
